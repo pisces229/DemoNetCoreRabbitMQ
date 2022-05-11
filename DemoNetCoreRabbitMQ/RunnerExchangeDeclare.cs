@@ -32,19 +32,23 @@ namespace DemoNetCoreRabbitMQ
         }
         public void Run()
         {
-            // 生產者
-            using var connectionProducer = _connectionFactory.CreateConnection();
-            using var channelProducer = connectionProducer.CreateModel();
+            // 宣告
+            using var connectionDeclare = _connectionFactory.CreateConnection();
+            using var channelDeclare = connectionDeclare.CreateModel();
             // 宣告交換機 ExchangeType
-            channelProducer.ExchangeDeclare(_exchangeName, ExchangeType.Fanout);
-            //channelProducer.ExchangeDeclare(_exchangeName, ExchangeType.Direct);
-            //channelProducer.ExchangeDeclare(_exchangeName, ExchangeType.Topic);
+            channelDeclare.ExchangeDeclare(_exchangeName, ExchangeType.Fanout);
+            //channelDeclare.ExchangeDeclare(_exchangeName, ExchangeType.Direct);
+            //channelDeclare.ExchangeDeclare(_exchangeName, ExchangeType.Topic);
             // 宣告佇列
-            channelProducer.QueueDeclare(_queueName1, false, false, false, null);
-            channelProducer.QueueDeclare(_queueName2, false, false, false, null);
+            channelDeclare.QueueDeclare(_queueName1, false, false, false, null);
+            channelDeclare.QueueDeclare(_queueName2, false, false, false, null);
             // 將佇列與交換機進行繫結
-            channelProducer.QueueBind(_queueName1, _exchangeName, "", null);
-            channelProducer.QueueBind(_queueName2, _exchangeName, "", null);
+            channelDeclare.QueueBind(_queueName1, _exchangeName, "", null);
+            channelDeclare.QueueBind(_queueName2, _exchangeName, "", null);
+            var basicGetResult1 = channelDeclare.BasicGet(_queueName1, false);
+            _logger.LogInformation($"{_queueName1}:{(basicGetResult1 != null ? basicGetResult1.MessageCount : 0)}");
+            var basicGetResult2 = channelDeclare.BasicGet(_queueName2, false);
+            _logger.LogInformation($"{_queueName2}:{(basicGetResult2 != null ? basicGetResult2.MessageCount : 0)}");
 
             // 消費者
             // 消費者1
@@ -55,7 +59,7 @@ namespace DemoNetCoreRabbitMQ
             {
                 _logger.LogInformation($"Consumer1 Receive:{Encoding.UTF8.GetString(eventArgs.Body.ToArray())}");
             };
-            //channelConsumer1.BasicConsume(_queueName1, false, eventingBasicConsumer1);
+            channelConsumer1.BasicConsume(_queueName1, false, eventingBasicConsumer1);
             // 消費者2
             using var connectionConsumer2 = _connectionFactory.CreateConnection();
             using var channelConsumer2 = connectionConsumer2.CreateModel();
@@ -64,17 +68,16 @@ namespace DemoNetCoreRabbitMQ
             {
                 _logger.LogInformation($"Consumer2 Receive:{Encoding.UTF8.GetString(eventArgs.Body.ToArray())}");
             };
-            //channelConsumer2.BasicConsume(_queueName2, false, eventingBasicConsumer2);
+            channelConsumer2.BasicConsume(_queueName2, false, eventingBasicConsumer2);
 
+            // 生產者
+            using var connectionProducer = _connectionFactory.CreateConnection();
+            using var channelProducer = connectionProducer.CreateModel();
             var message = "start";
             do
             {
                 if (!string.IsNullOrEmpty(message))
                 {
-                    var basicGetResult1 = channelProducer.BasicGet(_queueName1, false);
-                    _logger.LogInformation($"{_queueName1}:{(basicGetResult1 != null ? basicGetResult1.MessageCount : 0)}");
-                    var basicGetResult2 = channelProducer.BasicGet(_queueName2, false);
-                    _logger.LogInformation($"{_queueName2}:{(basicGetResult2 != null ? basicGetResult2.MessageCount : 0)}");
                     // Publish
                     Console.WriteLine("Publish:");
                     message = Console.ReadLine()!;
